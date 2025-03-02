@@ -1,0 +1,126 @@
+/* Modern UI/UX Styling - Enhanced Drag & Drop Box */
+body {
+    font-family: 'Poppins', sans-serif;
+    text-align: center;
+    margin: 0;
+    background: linear-gradient(135deg, #1e293b, #334155);
+    color: #ffffff;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100vh;
+}
+
+.disclaimer {
+    background: rgba(255, 229, 143, 0.2);
+    border-left: 4px solid #ffd700;
+    padding: 5px;
+    margin: 10px 0;
+    border-radius: 6px;
+    font-size: 14px;
+    text-align: left;
+}
+
+.container {
+    width: 90%;
+    max-width: 500px;
+    padding: 20px;
+    background: rgba(255, 255, 255, 0.95); /* Fallback */
+    background: rgba(255, 255, 255, 0.15);
+    border-radius: 15px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+}
+
+.disclaimer::before {
+    content: "⚠️ ";
+    margin-right: 8px;
+}
+
+#dropZone {
+    border: 2px dashed rgba(255, 255, 255, 0.6);
+    padding: 35px;
+    width: 85%;
+    margin: 15px 0;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 12px;
+    cursor: pointer;
+    transition: all 0.3s ease-in-out;
+    text-align: center;
+    font-size: 16px;
+    font-weight: 500;
+}
+
+#dropZone:hover {
+    background: rgba(255, 255, 255, 0.2);
+    transform: scale(1.05);
+    border-color: #4ade80;
+}
+
+button {
+    width: 100%;
+    padding: 12px;
+    margin-top: 10px;
+    border: none;
+    border-radius: 8px;
+    background: #4ade80;
+    color: white;
+    font-size: 16px;
+    cursor: pointer;
+    transition: background 0.3s ease-in-out, transform 0.2s;
+}
+
+button:hover {
+    background: #22c55e;
+    transform: scale(1.05);
+}
+
+#statusMessage {
+    margin-top: 10px;
+    font-weight: bold;
+}
+
+#progressBar {
+    width: 100%;
+    height: 8px;
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 10px;
+    margin-top: 10px;
+    overflow: hidden;
+    display: none;
+}
+
+#progressBar div {
+    height: 100%;
+    width: 0%;
+    background: #4ade80;
+    transition: width 0.3s ease-in-out;
+}
+
+.spinner {
+    border: 4px solid #f3f3f3;
+    border-top: 4px solid #4ade80;
+    border-radius: 50%;
+    width: 30px;
+    height: 30px;
+    animation: spin 1s linear infinite;
+    margin: 10px auto;
+    display: none;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+@media (max-width: 600px) {
+    .container {
+        width: 95%;
+        padding: 15px;
+    }
+    #dropZone {
+        padding: 30px;
+    }
+}
