@@ -8,19 +8,26 @@
 </head>
 <body>
     <div class="disclaimer">
-        We do NOT store your uploaded files. Converted files will be kept on server. 
-        Please keep a copy of your original data.
+        The application will not store uploaded or converted files. They are automatically deleted after processing.
+        Please keep a copy of your files to avoid loss of data.
     </div>
+
     <div class="container">
         <h1>JSON to Excel Converter</h1>
+
+        <!-- Drag & Drop Area -->
         <div id="dropZone">Drag & Drop JSON File Here or Click to Upload</div>
         <input type="file" id="fileInput" accept=".json" hidden>
-        <button id="uploadButton">Convert to Excel</button>
-        <p id="statusMessage"></p>
+
+        <!-- Convert Button (Initially Disabled) -->
+        <button id="convertButton" disabled>Convert to Excel</button>
+
+        <!-- Status Message & Progress -->
         <div id="progressBar"><div></div></div>
         <div class="spinner" id="spinner"></div>
-        <p id="downloadLink"></p>
+        <p id="statusMessage"></p>
     </div>
+
     <script src="{{ url_for('static', filename='script.js') }}"></script>
 </body>
 </html>

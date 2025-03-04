@@ -3,7 +3,10 @@ import os
 import json
 import logging
 
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
+
+UPLOAD_FOLDER = "uploads"
+CONVERTED_FOLDER = "converted"
 
 def flatten_json(nested_json, parent_key="", sep="_"):
     items = []
@@ -35,12 +38,11 @@ def convert_json_to_excel(json_filepath, excel_path):
             try:
                 data = json.load(file)
             except json.JSONDecodeError as e:
-                raise json.JSONDecodeError(f"Invalid JSON format in {json_filepath}: {e.msg}", e.doc, e.pos)
+                raise ValueError(f"Invalid JSON format in {json_filepath}: {e}")
 
         # Validate JSON structure
         if isinstance(data, dict):
             data = data.get("data", [data]) if "data" in data else [data]
-
         if not isinstance(data, list) or not data:
             raise ValueError(f"JSON data in {json_filepath} must be a non-empty array.")
 
@@ -67,21 +69,24 @@ def convert_json_to_excel(json_filepath, excel_path):
         if not os.path.exists(excel_path):
             raise OSError(f"Failed to create Excel file at {excel_path}")
 
-        logging.info(f"Conversion successful: {json_filepath} to {excel_path}")
-        return True, excel_path  # Return True for success and the path
+        # Cleanup: Remove the uploaded JSON file after successful conversion
+        os.remove(json_filepath)
 
-    except FileNotFoundError as e:
-        logging.error(f"Conversion error: {e}")
-        return False, str(e)
-    except json.JSONDecodeError as e:
-        logging.error(f"Conversion error: {e}")
-        return False, str(e)
-    except ValueError as e:
-        logging.error(f"Conversion error: {e}")
-        return False, str(e)
-    except OSError as e:
+        logging.info(f"Conversion successful: {json_filepath} -> {excel_path}")
+        return True, excel_path
+
+    except (FileNotFoundError, ValueError, OSError) as e:
         logging.error(f"Conversion error: {e}")
         return False, str(e)
     except Exception as e:
         logging.error(f"Unexpected conversion error: {e}")
         return False, str(e)
+
+def delete_converted_file(filepath):
+    """Deletes the converted file after it has been downloaded."""
+    try:
+        if os.path.exists(filepath):
+            os.remove(filepath)
+            logging.info(f"Deleted file: {filepath}")
+    except Exception as e:
+        logging.error(f"Error deleting file {filepath}: {e}")

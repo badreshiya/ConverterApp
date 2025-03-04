@@ -1,125 +1,131 @@
-document.addEventListener('DOMContentLoaded', function() {
-    const dropZone = document.getElementById('dropZone');
-    const fileInput = document.getElementById('fileInput');
-    const uploadButton = document.getElementById('uploadButton');  // Get the upload button
-    const statusMessage = document.getElementById('statusMessage');
-    const progressBar = document.getElementById('progressBar').querySelector('div');  // Correctly select the inner div
-    const spinner = document.getElementById('spinner');
-    const downloadLink = document.getElementById('downloadLink');
+document.addEventListener("DOMContentLoaded", function () {
+    const dropZone = document.getElementById("dropZone");
+    const fileInput = document.getElementById("fileInput");
+    const convertButton = document.getElementById("convertButton");
+    const statusMessage = document.getElementById("statusMessage");
+    const progressBar = document.getElementById("progressBar").querySelector("div");
+    const spinner = document.getElementById("spinner");
 
+    let selectedFile = null;
+    let downloadURL = null;
 
-    function uploadFile(file) {
-        if (!file || file.type !== "application/json") {
-            statusMessage.textContent = "Please upload a valid JSON file.";
+    function resetUI() {
+        progressBar.style.width = "0%";
+        progressBar.parentElement.style.display = "none";
+        spinner.style.display = "none";
+        convertButton.textContent = "Convert to Excel";
+        convertButton.disabled = true;
+        convertButton.onclick = startUpload;
+        downloadURL = null;
+        fileInput.value = "";
+        statusMessage.textContent = "";
+    }
+
+    function startUpload() {
+        if (!selectedFile) {
+            statusMessage.textContent = "Please select a file first.";
             statusMessage.style.color = "red";
             return;
         }
 
-        statusMessage.textContent = '';
-        statusMessage.style.color = '';
-        progressBar.style.width = '0%';
-        progressBar.parentElement.style.display = 'block'; // Show the progress bar container
-        spinner.style.display = 'block';
+        resetUI();
+        statusMessage.textContent = "Converting...";
+        progressBar.parentElement.style.display = "block";
+        spinner.style.display = "block";
+        convertButton.disabled = true;
 
         const formData = new FormData();
-        formData.append('file', file);
+        formData.append("file", selectedFile);
 
-        fetch('/', {
-            method: 'POST',
+        fetch("/upload", {
+            method: "POST",
             body: formData,
-            headers: {
-                'Accept': 'application/json'  // Crucial: Tell the server we expect JSON
-            }
+            headers: { Accept: "application/json" },
         })
-        .then(response => {
-            // Check for HTTP errors *before* parsing JSON
-            if (!response.ok) {
-                return response.json().then(data => {
-                    throw new Error(data.error || 'Server error');
-                }).catch(() => { // Handle non-JSON error responses
-                    throw new Error('Server error');
-                });
-            }
-            return response.json(); // Only parse JSON if successful
-        })
-        .then(data => {
-             spinner.style.display = 'none';
-             progressBar.style.width = '100%';
+            .then((response) => response.json())
+            .then((data) => {
+                spinner.style.display = "none";
+                progressBar.style.width = "100%";
 
-             if (data.download_url) { //Changed: use download_url
-                // Display S3 URL.
-                downloadLink.href = data.download_url; //Changed: use download_url
-                downloadLink.textContent = 'Download from S3';
-                downloadLink.style.display = 'block'; // Make link visible
-                downloadLink.target = "_blank"; // Open in a new tab/window
-                statusMessage.textContent = 'Conversion successful! File uploaded to S3.';
-                statusMessage.style.color = 'green';
-
-             }
-             else {
-                //Should not reach here, handled via error.
-                statusMessage.textContent = 'Conversion successful! But failed to display S3 URL';
-                statusMessage.style.color = 'green';
-                downloadLink.style.display = 'none';
-             }
-
-        })
-        .catch(error => {
-            console.error('Error:', error);
-            statusMessage.textContent = `Error: ${error.message}`; // Show specific error
-            statusMessage.style.color = 'red';
-            spinner.style.display = 'none';
-            progressBar.parentElement.style.display = 'none';
-        });
+                if (data.file_path) {
+                    downloadURL = data.file_path;
+                    convertButton.textContent = "Download Converted File";
+                    convertButton.onclick = downloadFile; // Fix: Ensure downloadFile is called
+                    convertButton.disabled = false;
+                    statusMessage.textContent = "Conversion successful!";
+                    statusMessage.style.color = "green";
+                } else {
+                    statusMessage.textContent = data.error || "Conversion failed!";
+                    statusMessage.style.color = "red";
+                    convertButton.textContent = "Convert to Excel"; // Reset button text on failure
+                    convertButton.onclick = startUpload;
+                    convertButton.disabled = false;
+                }
+            })
+            .catch((error) => {
+                console.error("Error:", error);
+                statusMessage.textContent = "Error: " + error.message;
+                statusMessage.style.color = "red";
+                spinner.style.display = "none";
+                progressBar.parentElement.style.display = "none";
+                convertButton.disabled = false;
+            });
     }
 
+    function downloadFile() {
+        if (!downloadURL) {
+            statusMessage.textContent = "No file available for download.";
+            statusMessage.style.color = "red";
+            return;
+        }
 
+        // ✅ Force file download instead of just opening it
+        const a = document.createElement("a");
+        a.href = downloadURL;
+        a.download = downloadURL.split("/").pop(); // Get file name from URL
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
 
-    // Event Listeners
+        statusMessage.textContent = "Download completed.";
+        statusMessage.style.color = "green";
 
-    // 1. Drag and Drop Events
-    dropZone.addEventListener('dragover', (e) => {
-        e.preventDefault();
-        dropZone.classList.add('drag-over');
+        // Reset UI after 3 seconds
+        setTimeout(resetUI, 3000);
+    }
+
+    // ✅ Enable Clicking on Drop Zone to Open File Dialog
+    dropZone.addEventListener("click", () => fileInput.click());
+
+    // ✅ Handle File Selection
+    fileInput.addEventListener("change", () => {
+        selectedFile = fileInput.files[0];
+        statusMessage.textContent = "File selected: " + selectedFile.name;
+        statusMessage.style.color = "blue";
+        convertButton.disabled = false;
     });
 
-    dropZone.addEventListener('dragleave', (e) => {
-        e.preventDefault();
-        dropZone.classList.remove('drag-over');
+    // ✅ Handle Drag & Drop Functionality
+    dropZone.addEventListener("dragover", (event) => {
+        event.preventDefault();
+        dropZone.style.borderColor = "lightblue";
     });
 
-    dropZone.addEventListener('drop', (e) => {
-        e.preventDefault();
-        dropZone.classList.remove('drag-over');
-        const files = e.dataTransfer.files;
-        if (files.length > 0) {
-            fileInput.files = files; // Set the file input's files
-            uploadFile(files[0]);    // Automatically upload
+    dropZone.addEventListener("dragleave", () => {
+        dropZone.style.borderColor = "";
+    });
+
+    dropZone.addEventListener("drop", (event) => {
+        event.preventDefault();
+        dropZone.style.borderColor = "";
+
+        if (event.dataTransfer.files.length > 0) {
+            selectedFile = event.dataTransfer.files[0];
+            statusMessage.textContent = "File selected: " + selectedFile.name;
+            statusMessage.style.color = "blue";
+            convertButton.disabled = false;
         }
     });
 
-    // 2. File Input Change Event
-    fileInput.addEventListener('change', (e) => {
-        if (fileInput.files.length > 0) {
-            uploadFile(fileInput.files[0]); // Upload selected file
-        }
-    });
-
-    // 3. Click event on the dropZone to trigger file input
-    dropZone.addEventListener('click', () => {
-        fileInput.click(); // Programmatically click the hidden file input
-    });
-
-    // 4. Upload Button (Optional - if you want a separate button)
-    if (uploadButton) { // Check if uploadButton exists
-        uploadButton.addEventListener('click', () => {
-           if (fileInput.files.length > 0) {
-              uploadFile(fileInput.files[0]);
-            } else {
-              statusMessage.textContent = "Please select a file first.";
-              statusMessage.style.color = "red";
-            }
-        });
-    }
-
+    convertButton.addEventListener("click", startUpload);
 });
