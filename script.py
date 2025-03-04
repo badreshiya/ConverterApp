@@ -2,64 +2,86 @@ import pandas as pd
 import os
 import json
 import logging
-import uuid
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 def flatten_json(nested_json, parent_key="", sep="_"):
     items = []
     if isinstance(nested_json, dict):
-        for key, value in nested_json.items():
-            new_key = f"{parent_key}{sep}{key}" if parent_key else key
-            if isinstance(value, (dict, list)):
-                items.extend(flatten_json(value, new_key, sep=sep).items())
+        for k, v in nested_json.items():
+            new_key = f"{parent_key}{sep}{k}" if parent_key else k
+            if isinstance(v, (dict, list)):
+                items.extend(flatten_json(v, new_key, sep=sep).items())
             else:
-                items.append((new_key, value))
+                items.append((new_key, v))
     elif isinstance(nested_json, list):
         for i, element in enumerate(nested_json):
             items.extend(flatten_json(element, f"{parent_key}{sep}{i}", sep=sep).items())
     return dict(items)
 
-def convert_json_to_excel(json_filepath, output_folder):
+def convert_json_to_excel(json_filepath, excel_path):
     try:
-        # Validate file
+        # Validate input file path
+        if not isinstance(json_filepath, str) or not json_filepath:
+            raise ValueError("JSON file path must be a non-empty string.")
         if not os.path.isfile(json_filepath):
-            logging.error(f"File not found: {json_filepath}")
-            return "File not found"
+            raise FileNotFoundError(f"File not found: {json_filepath}")
+
+        # Validate output file path
+        if not isinstance(excel_path, str) or not excel_path:
+            raise ValueError("Excel file path must be a non-empty string.")
 
         with open(json_filepath, "r", encoding="utf-8") as file:
-            data = json.load(file)
+            try:
+                data = json.load(file)
+            except json.JSONDecodeError as e:
+                raise json.JSONDecodeError(f"Invalid JSON format in {json_filepath}: {e.msg}", e.doc, e.pos)
 
         # Validate JSON structure
         if isinstance(data, dict):
             data = data.get("data", [data]) if "data" in data else [data]
 
-        if not isinstance(data, list) or len(data) == 0:
-            logging.error(f"JSON root must be a non-empty array in: {json_filepath}")
-            return "JSON root must be a non-empty array"
+        if not isinstance(data, list) or not data:
+            raise ValueError(f"JSON data in {json_filepath} must be a non-empty array.")
 
         # Process data
         flattened_data = [flatten_json(record) for record in data]
-        df = pd.DataFrame(flattened_data)
+        try:
+            df = pd.DataFrame(flattened_data)
+        except Exception as e:
+            raise ValueError(f"Error creating DataFrame from {json_filepath}: {e}")
 
         if df.empty:
-            logging.warning(f"No valid data found in JSON: {json_filepath}")
-            return "No valid data found in JSON"
+            raise ValueError(f"No valid data found in {json_filepath} after flattening.")
 
-        # Save Excel
-        os.makedirs(output_folder, exist_ok=True)
-        # Using the original filename with .xlsx extension
-        original_filename = os.path.basename(json_filepath)
-        output_filename = os.path.splitext(original_filename)[0] + ".xlsx"
-        excel_path = os.path.join(output_folder, output_filename)
+        # Ensure output directory exists
+        os.makedirs(os.path.dirname(excel_path), exist_ok=True)
 
-        df.to_excel(excel_path, index=False, engine="openpyxl")
-        logging.info(f"Successfully converted {json_filepath} to {excel_path}")
-        return excel_path
+        # Save Excel file
+        try:
+            df.to_excel(excel_path, index=False, engine="openpyxl")
+        except Exception as e:
+            raise OSError(f"Failed to write Excel file {excel_path}: {e}")
 
-    except json.JSONDecodeError:
-        logging.error(f"Invalid JSON format in: {json_filepath}")
-        return "Invalid JSON format"
+        # Verify output file
+        if not os.path.exists(excel_path):
+            raise OSError(f"Failed to create Excel file at {excel_path}")
+
+        logging.info(f"Conversion successful: {json_filepath} to {excel_path}")
+        return True, excel_path  # Return True for success and the path
+
+    except FileNotFoundError as e:
+        logging.error(f"Conversion error: {e}")
+        return False, str(e)
+    except json.JSONDecodeError as e:
+        logging.error(f"Conversion error: {e}")
+        return False, str(e)
+    except ValueError as e:
+        logging.error(f"Conversion error: {e}")
+        return False, str(e)
+    except OSError as e:
+        logging.error(f"Conversion error: {e}")
+        return False, str(e)
     except Exception as e:
-        logging.error(f"Processing error in {json_filepath}: {str(e)}")
-        return f"Processing error: {str(e)}"
+        logging.error(f"Unexpected conversion error: {e}")
+        return False, str(e)

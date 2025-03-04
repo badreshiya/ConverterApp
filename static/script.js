@@ -1,119 +1,125 @@
-document.addEventListener("DOMContentLoaded", function () {
-    const dropZone = document.getElementById("dropZone");
-    const fileInput = document.getElementById("fileInput");
-    const uploadButton = document.getElementById("uploadButton");
-    const statusMessage = document.getElementById("statusMessage");
-    const downloadLink = document.getElementById("downloadLink");
-    const progressBar = document.getElementById("progressBar");
-    const progressBarFill = progressBar.querySelector("div");
-    const spinner = document.getElementById("spinner");
+document.addEventListener('DOMContentLoaded', function() {
+    const dropZone = document.getElementById('dropZone');
+    const fileInput = document.getElementById('fileInput');
+    const uploadButton = document.getElementById('uploadButton');  // Get the upload button
+    const statusMessage = document.getElementById('statusMessage');
+    const progressBar = document.getElementById('progressBar').querySelector('div');  // Correctly select the inner div
+    const spinner = document.getElementById('spinner');
+    const downloadLink = document.getElementById('downloadLink');
 
-    // File validation
-    const isValidFile = (file) => {
-        return file && file.name.toLowerCase().endsWith(".json");
-    };
 
-    // Drag & drop handlers
-    dropZone.addEventListener("dragover", (e) => {
-        e.preventDefault();
-        dropZone.style.borderColor = "#4ade80";
-    });
-
-    dropZone.addEventListener("dragleave", () => {
-        dropZone.style.borderColor = "rgba(255, 255, 255, 0.6)";
-    });
-
-    dropZone.addEventListener("drop", (e) => {
-        e.preventDefault();
-        dropZone.style.borderColor = "rgba(255, 255, 255, 0.6)";
-        const file = e.dataTransfer.files[0];
-        
-        if (isValidFile(file)) {
-            fileInput.files = e.dataTransfer.files;
-            statusMessage.textContent = `Selected: ${file.name}`;
-            statusMessage.style.color = "#ffffff";
-        } else {
-            statusMessage.textContent = "Please drop a valid JSON file";
-            statusMessage.style.color = "#ff6b6b";
-        }
-    });
-
-    // Click handler
-    dropZone.addEventListener("click", () => fileInput.click());
-
-    // File input handler
-    fileInput.addEventListener("change", () => {
-        if (fileInput.files.length > 0) {
-            const file = fileInput.files[0];
-            if (isValidFile(file)) {
-                statusMessage.textContent = `Selected: ${file.name}`;
-                statusMessage.style.color = "#ffffff";
-            } else {
-                statusMessage.textContent = "Invalid file type. Only JSON allowed";
-                statusMessage.style.color = "#ff6b6b";
-                fileInput.value = "";
-            }
-        }
-    });
-
-    // Upload handler
-    uploadButton.addEventListener("click", async () => {
-        if (!fileInput.files.length) {
-            statusMessage.textContent = "Please select a file first";
-            statusMessage.style.color = "#ff6b6b";
+    function uploadFile(file) {
+        if (!file || file.type !== "application/json") {
+            statusMessage.textContent = "Please upload a valid JSON file.";
+            statusMessage.style.color = "red";
             return;
         }
 
-        const file = fileInput.files[0];
+        statusMessage.textContent = '';
+        statusMessage.style.color = '';
+        progressBar.style.width = '0%';
+        progressBar.parentElement.style.display = 'block'; // Show the progress bar container
+        spinner.style.display = 'block';
+
         const formData = new FormData();
-        formData.append("jsonFiles", file);
+        formData.append('file', file);
 
-        // UI updates
-        progressBar.style.display = "block";
-        spinner.style.display = "block";
-        progressBarFill.style.width = "0%";
-
-        try {
-            const response = await fetch("/upload", {
-                method: "POST",
-                body: formData,
-            });
-
-            const data = await response.json();
-            
-            if (data.error) {
-                throw new Error(data.error);
+        fetch('/', {
+            method: 'POST',
+            body: formData,
+            headers: {
+                'Accept': 'application/json'  // Crucial: Tell the server we expect JSON
             }
-
-            progressBarFill.style.width = "100%";
-            statusMessage.textContent = "Conversion completed!";
-            statusMessage.style.color = "#4ade80";
-
-            if (data.files?.[0]?.download_url) {
-                downloadLink.innerHTML = `
-                    <a href="${data.files[0].download_url}" download 
-                       class="download-btn">
-                        Download ${data.files[0].filename}
-                    </a>
-                `;
-
-                // Auto-clear download link after 5 minutes
-                setTimeout(() => {
-                    downloadLink.innerHTML = "";
-                    statusMessage.textContent = "Ready for new conversion";
-                    statusMessage.style.color = "#ffffff";
-                }, 300000);
+        })
+        .then(response => {
+            // Check for HTTP errors *before* parsing JSON
+            if (!response.ok) {
+                return response.json().then(data => {
+                    throw new Error(data.error || 'Server error');
+                }).catch(() => { // Handle non-JSON error responses
+                    throw new Error('Server error');
+                });
             }
-        } catch (error) {
-            console.error("Upload error:", error);
-            statusMessage.textContent = `Error: ${error.message}`;
-            statusMessage.style.color = "#ff6b6b";
-        } finally {
-            setTimeout(() => {
-                progressBar.style.display = "none";
-                spinner.style.display = "none";
-            }, 1000);
-            fileInput.value = "";
+            return response.json(); // Only parse JSON if successful
+        })
+        .then(data => {
+             spinner.style.display = 'none';
+             progressBar.style.width = '100%';
+
+             if (data.download_url) { //Changed: use download_url
+                // Display S3 URL.
+                downloadLink.href = data.download_url; //Changed: use download_url
+                downloadLink.textContent = 'Download from S3';
+                downloadLink.style.display = 'block'; // Make link visible
+                downloadLink.target = "_blank"; // Open in a new tab/window
+                statusMessage.textContent = 'Conversion successful! File uploaded to S3.';
+                statusMessage.style.color = 'green';
+
+             }
+             else {
+                //Should not reach here, handled via error.
+                statusMessage.textContent = 'Conversion successful! But failed to display S3 URL';
+                statusMessage.style.color = 'green';
+                downloadLink.style.display = 'none';
+             }
+
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            statusMessage.textContent = `Error: ${error.message}`; // Show specific error
+            statusMessage.style.color = 'red';
+            spinner.style.display = 'none';
+            progressBar.parentElement.style.display = 'none';
+        });
+    }
+
+
+
+    // Event Listeners
+
+    // 1. Drag and Drop Events
+    dropZone.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        dropZone.classList.add('drag-over');
+    });
+
+    dropZone.addEventListener('dragleave', (e) => {
+        e.preventDefault();
+        dropZone.classList.remove('drag-over');
+    });
+
+    dropZone.addEventListener('drop', (e) => {
+        e.preventDefault();
+        dropZone.classList.remove('drag-over');
+        const files = e.dataTransfer.files;
+        if (files.length > 0) {
+            fileInput.files = files; // Set the file input's files
+            uploadFile(files[0]);    // Automatically upload
         }
     });
+
+    // 2. File Input Change Event
+    fileInput.addEventListener('change', (e) => {
+        if (fileInput.files.length > 0) {
+            uploadFile(fileInput.files[0]); // Upload selected file
+        }
+    });
+
+    // 3. Click event on the dropZone to trigger file input
+    dropZone.addEventListener('click', () => {
+        fileInput.click(); // Programmatically click the hidden file input
+    });
+
+    // 4. Upload Button (Optional - if you want a separate button)
+    if (uploadButton) { // Check if uploadButton exists
+        uploadButton.addEventListener('click', () => {
+           if (fileInput.files.length > 0) {
+              uploadFile(fileInput.files[0]);
+            } else {
+              statusMessage.textContent = "Please select a file first.";
+              statusMessage.style.color = "red";
+            }
+        });
+    }
+
 });
